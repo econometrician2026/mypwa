@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#2563eb">
+  <title>目標手帳 Pro - Habit & Goal Tracker</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* Native Mobile Restrictions & UX Polish */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Input elements editable exception & iOS automatic zoom prevention */
+    input, textarea, select {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      font-size: 16px !important; /* Prevents auto zoom on iOS */
+    }
+
+    /* Active Touch Scale Feedback for Buttons */
+    .btn-active, button, .clickable-card {
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease;
+    }
+    .btn-active:active, button:active, .clickable-card:active {
+      transform: scale(0.96) !important;
+      opacity: 0.9;
+    }
+
+    /* Safe Area Inset Support for Notch Phones */
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Custom Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.3);
+      border-radius: 9999px;
+    }
+
+    /* Smooth Progress Bar Transitions */
+    .progress-bar-fill {
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Hide scrollbars for filter pill list */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-300 selection:bg-blue-500 selection:text-white">
+
+  <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 px-4 py-3 shadow-sm">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div id="appLogoIcon" class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i class="ph-bold ph-check-square-offset text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-none bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">目標手帳 Pro</h1>
+          <p id="currentDateText" class="text-xs text-gray-500 dark:text-slate-400 mt-0.5">2026年10月6日 星期二</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- PWA Install Button (Dynamic) -->
+        <button id="pwaInstallBtn" class="hidden text-xs bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-full font-medium shadow-sm flex items-center gap-1">
+          <i class="ph-bold ph-download-simple"></i> 安裝 App
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" aria-label="切換深淺模式" class="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700">
+          <i class="ph-bold ph-moon text-lg dark:hidden"></i>
+          <i class="ph-bold ph-sun text-lg hidden dark:block text-amber-400"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-md mx-auto w-full px-4 pt-4 pb-2">
+    <!-- Progress & Streak Card -->
+    <div class="bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-2xl p-4 text-white shadow-lg shadow-blue-500/15 relative overflow-hidden">
+      <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+
+      <div class="flex justify-between items-start mb-3 relative z-10">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-blue-200">今日完成率</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span id="progressPercent" class="text-3xl font-extrabold tracking-tight">0%</span>
+            <span id="progressFraction" class="text-xs text-blue-200">(0/0 已打卡)</span>
+          </div>
+        </div>
+        <div class="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-white/20">
+          <i class="ph-fill ph-fire text-amber-300 text-lg animate-pulse"></i>
+          <div class="text-right">
+            <div id="streakDays" class="text-sm font-bold leading-none">0 天</div>
+            <div class="text-[10px] text-blue-100 leading-tight">連續打卡</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Bar Track -->
+      <div class="w-full bg-black/20 rounded-full h-3 p-0.5 relative z-10 backdrop-blur-sm">
+        <div id="progressBarFill" class="progress-bar-fill bg-gradient-to-r from-emerald-300 to-teal-300 h-2 rounded-full w-0 shadow-sm"></div>
+      </div>
+
+      <p id="motivationText" class="text-xs text-blue-100 mt-2.5 font-medium flex items-center gap-1">
+        <i class="ph-bold ph-sparkle text-amber-300"></i>
+        <span>設定你的第一項目標，開始完美的一天吧！</span>
+      </p>
+    </div>
+  </div>
+
+  <main class="max-w-md mx-auto w-full px-4 flex-1 pb-24">
+    <!-- Tab Controls -->
+    <div class="flex bg-gray-200/80 dark:bg-slate-800/80 p-1 rounded-xl my-4 text-sm font-medium">
+      <button id="tabHabitsBtn" onclick="switchTab('habits')" class="flex-1 py-2 rounded-lg text-center font-bold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm transition-all flex items-center justify-center gap-1.5">
+        <i class="ph-bold ph-check-circle text-base"></i> 今日目標
+      </button>
+      <button id="tabJournalBtn" onclick="switchTab('journal')" class="flex-1 py-2 rounded-lg text-center text-gray-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all flex items-center justify-center gap-1.5">
+        <i class="ph-bold ph-book-open text-base"></i> 反思日誌
+      </button>
+      <button id="tabStatsBtn" onclick="switchTab('stats')" class="flex-1 py-2 rounded-lg text-center text-gray-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all flex items-center justify-center gap-1.5">
+        <i class="ph-bold ph-chart-line-up text-base"></i> 數據統計
+      </button>
+    </div>
+
+    <section id="habitsView" class="space-y-4">
+      <!-- Category & Status Filter Pills -->
+      <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 text-xs">
+        <button onclick="setCategoryFilter('all')" class="cat-filter-btn active bg-slate-800 text-white dark:bg-blue-600 dark:text-white px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all shadow-sm">
+          全部
+        </button>
+        <button onclick="setCategoryFilter('健康')" class="cat-filter-btn bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all">
+          🥗 健康
+        </button>
+        <button onclick="setCategoryFilter('學習')" class="cat-filter-btn bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all">
+          📚 學習
+        </button>
+        <button onclick="setCategoryFilter('工作')" class="cat-filter-btn bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all">
+          💼 工作
+        </button>
+        <button onclick="setCategoryFilter('運動')" class="cat-filter-btn bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all">
+          🏃 運動
+        </button>
+        <button onclick="setCategoryFilter('心靈')" class="cat-filter-btn bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all">
+          🧘 心靈
+        </button>
+      </div>
+
+      <!-- Habit List Container -->
+      <div id="habitList" class="space-y-3">
+        <!-- Dynamic Cards Inserted Here -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-12 px-4 rounded-2xl bg-white dark:bg-slate-900 border border-dashed border-gray-300 dark:border-slate-800">
+        <div class="w-16 h-16 bg-blue-50 dark:bg-slate-800 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-3">
+          <i class="ph-bold ph-plus-circle text-3xl"></i>
+        </div>
+        <h3 class="font-bold text-gray-800 dark:text-slate-200 text-base">目前尚無目標卡片</h3>
+        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">點擊下方按鈕建立第一個每日目標，開啟習慣養成之旅！</p>
+      </div>
+    </section>
+
+    <section id="journalView" class="hidden space-y-4">
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-3">
+        <div class="flex justify-between items-center">
+          <h2 class="font-bold text-gray-900 dark:text-white flex items-center gap-1.5 text-base">
+            <i class="ph-bold ph-pencil-simple text-blue-500"></i> 今日反思與心情
+          </h2>
+          <span id="journalDateLabel" class="text-xs text-gray-400">10/06</span>
+        </div>
+
+        <!-- Mood Selector -->
+        <div>
+          <label class="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1.5">今天的心情狀態：</label>
+          <div class="flex justify-between gap-1">
+            <button type="button" onclick="selectMood('😄')" class="mood-btn flex-1 py-2 text-xl rounded-xl bg-gray-50 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-slate-700 transition-all border-2 border-transparent">😄</button>
+            <button type="button" onclick="selectMood('😌')" class="mood-btn flex-1 py-2 text-xl rounded-xl bg-gray-50 dark:bg-slate-800 hover:bg-emerald-100 dark:hover:bg-slate-700 transition-all border-2 border-transparent">😌</button>
+            <button type="button" onclick="selectMood('😐')" class="mood-btn flex-1 py-2 text-xl rounded-xl bg-gray-50 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-slate-700 transition-all border-2 border-transparent">😐</button>
+            <button type="button" onclick="selectMood('😔')" class="mood-btn flex-1 py-2 text-xl rounded-xl bg-gray-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 transition-all border-2 border-transparent">😔</button>
+            <button type="button" onclick="selectMood('😫')" class="mood-btn flex-1 py-2 text-xl rounded-xl bg-gray-50 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-slate-700 transition-all border-2 border-transparent">😫</button>
+          </div>
+        </div>
+
+        <!-- Textarea -->
+        <div>
+          <label for="journalText" class="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">今天有什麼收穫、感恩或需要改進的地方？</label>
+          <textarea id="journalText" rows="4" placeholder="寫下今天的想法與反思..." class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-slate-100 placeholder-gray-400 resize-none"></textarea>
+        </div>
+
+        <button onclick="saveTodayJournal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow-md shadow-blue-500/20 text-sm flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-floppy-disk text-base"></i> 儲存今日日誌
+        </button>
+      </div>
+
+      <!-- Past Journals History -->
+      <div>
+        <h3 class="font-bold text-sm text-gray-600 dark:text-slate-400 mb-2 flex items-center gap-1">
+          <i class="ph-bold ph-clock-counter-clockwise"></i> 歷史反思紀錄
+        </h3>
+        <div id="journalHistoryList" class="space-y-2.5">
+          <!-- Dynamic Journal Entries -->
+        </div>
+      </div>
+    </section>
+
+    <section id="statsView" class="hidden space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm text-center">
+          <div class="text-2xl font-extrabold text-blue-600 dark:text-blue-400" id="statTotalChecks">0</div>
+          <div class="text-xs text-gray-500 dark:text-slate-400 mt-0.5">累計打卡次數</div>
+        </div>
+        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm text-center">
+          <div class="text-2xl font-extrabold text-amber-500" id="statMaxStreak">0 天</div>
+          <div class="text-xs text-gray-500 dark:text-slate-400 mt-0.5">最高連續打卡</div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-3">
+        <h3 class="font-bold text-sm text-gray-800 dark:text-slate-200 flex items-center gap-1.5">
+          <i class="ph-bold ph-chart-bar text-indigo-500"></i> 各分類目標佔比
+        </h3>
+        <div id="categoryStatsContainer" class="space-y-2 text-xs">
+          <!-- Dynamic Category Progress -->
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-2">
+        <h3 class="font-bold text-sm text-gray-800 dark:text-slate-200 flex items-center gap-1.5">
+          <i class="ph-bold ph-lightbulb text-amber-500"></i> 習慣養成建議
+        </h3>
+        <p class="text-xs text-gray-600 dark:text-slate-400 leading-relaxed">
+          微小的進步經過時間加持，會產生巨大的複利效應。每天完成 1-3 個核心目標，遠比設定過多目標更能長期堅持！
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Floating Add Button -->
+  <div class="fixed bottom-6 left-0 right-0 max-w-md mx-auto px-4 pointer-events-none flex justify-end z-20">
+    <button onclick="openAddHabitModal()" aria-label="新增目標" class="pointer-events-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white w-14 h-14 rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
+      <i class="ph-bold ph-plus text-2xl"></i>
+    </button>
+  </div>
+
+  <!-- Add / Edit Goal Modal -->
+  <div id="habitModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity duration-300">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 border border-gray-100 dark:border-slate-800 shadow-2xl space-y-4 transform transition-transform duration-300 translate-y-full sm:translate-y-0" id="habitModalContainer">
+      <div class="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-3">
+        <h3 id="modalTitle" class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <i class="ph-bold ph-plus-circle text-blue-600"></i> 新增目標卡片
+        </h3>
+        <button onclick="closeHabitModal()" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-500 hover:text-gray-800 dark:hover:text-white flex items-center justify-center">
+          <i class="ph-bold ph-x text-base"></i>
+        </button>
+      </div>
+
+      <form id="habitForm" onsubmit="handleSaveHabit(event)" class="space-y-3">
+        <input type="hidden" id="editHabitId" value="">
+
+        <div>
+          <label for="habitTitle" class="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">目標名稱 *</label>
+          <input type="text" id="habitTitle" required placeholder="例如：每天閱讀 30 分鐘" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-slate-100">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="habitCategory" class="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">分類標籤</label>
+            <select id="habitCategory" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-slate-100">
+              <option value="健康">🥗 健康</option>
+              <option value="學習">📚 學習</option>
+              <option value="工作">💼 工作</option>
+              <option value="運動">🏃 運動</option>
+              <option value="心靈">🧘 心靈</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="habitTarget" class="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">單位/次數</label>
+            <input type="text" id="habitTarget" placeholder="例如：1 次 / 30分鐘" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-slate-100">
+          </div>
+        </div>
+
+        <div>
+          <label for="habitNotes" class="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">備註/獎勵提示 (選填)</label>
+          <input type="text" id="habitNotes" placeholder="保持專注，堅持就是勝利！" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-slate-100">
+        </div>
+
+        <div class="pt-2 flex gap-2">
+          <button type="button" onclick="closeHabitModal()" class="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 text-sm font-medium">
+            取消
+          </button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20">
+            確認儲存
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Custom Alert Toast Banner (No alert window) -->
+  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white dark:bg-white/90 dark:text-slate-900 px-4 py-2 rounded-full text-xs font-medium shadow-lg backdrop-blur-md transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-1.5">
+    <i id="toastIcon" class="ph-bold ph-check-circle text-emerald-400 dark:text-emerald-600"></i>
+    <span id="toastMsg">提示訊息</span>
+  </div>
+
+  <script>
+    /* Service Worker & PWA Manifest Auto Injection */
+    (function initPWA() {
+      /* 1. Dynamic SVG Icon as Data URI */
+      const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+        <rect width="512" height="512" rx="128" fill="url(#grad)"/>
+        <path d="M150 260 L220 330 L360 180" stroke="white" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs>
+          <linearGradient id="grad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#3B82F6"/>
+            <stop offset="1" stop-color="#1D4ED8"/>
+          </linearGradient>
+        </defs>
+      </svg>`;
+
+      const svgDataUri = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgIcon);
+
+      // Inject Favicon
+      let faviconLink = document.createElement('link');
+      faviconLink.rel = 'icon';
+      faviconLink.type = 'image/svg+xml';
+      faviconLink.href = svgDataUri;
+      document.head.appendChild(faviconLink);
+
+      // Inject Apple Touch Icon
+      let appleIcon = document.createElement('link');
+      appleIcon.rel = 'apple-touch-icon';
+      appleIcon.href = svgDataUri;
+      document.head.appendChild(appleIcon);
+
+      /* 2. Dynamic Web App Manifest Injection */
+      const manifestObj = {
+        name: "目標手帳 Pro",
+        short_name: "目標手帳",
+        description: "個人每日目標打卡與反思手帳 - 習慣養成利器",
+        display: "standalone",
+        start_url: "./",
+        background_color: "#0f172a",
+        theme_color: "#2563eb",
+        icons: [
+          {
+            src: svgDataUri,
+            sizes: "512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }
+        ]
+      };
+
+      const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
+      const manifestUrl = URL.createObjectURL(manifestBlob);
+      let manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = manifestUrl;
+      document.head.appendChild(manifestLink);
+
+      /* 3. Register Service Worker via Blob URL for full offline PWA capability */
+      if ('serviceWorker' in navigator) {
+        const swCode = `
+          const CACHE_NAME = 'habit-tracker-cache-v1';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            e.respondWith(
+              caches.match(e.request).then((res) => {
+                return res || fetch(e.request).then((response) => {
+                  return response;
+                }).catch(() => {
+                  return caches.match('./');
+                });
+              })
+            );
+          });
+        `;
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register(swUrl)
+            .then(reg => console.log('PWA Service Worker registered:', reg.scope))
+            .catch(err => console.log('SW Registration failed:', err));
+        });
+      }
+    })();
+  </script>
+
+  <script>
+    /* ==========================================================================
+       APP STATE & LOCAL STORAGE PERSISTENCE
+       ========================================================================== */
+    const STORAGE_HABITS_KEY = 'habit_tracker_items_v1';
+    const STORAGE_JOURNAL_KEY = 'habit_tracker_journal_v1';
+    const STORAGE_THEME_KEY = 'habit_tracker_theme_v1';
+
+    let habits = [];
+    let journals = {};
+    let activeCategory = 'all';
+    let selectedMood = '😄';
+    let deferredPrompt = null;
+
+    // Default sample habits for new users
+    const defaultHabits = [
+      {
+        id: '1',
+        title: '晨間喝一大杯溫開水',
+        category: '健康',
+        target: '500 ml',
+        notes: '喚醒身體新陳代謝',
+        createdAt: new Date().toISOString(),
+        history: {}
+      },
+      {
+        id: '2',
+        title: '閱讀專業書籍 20 頁',
+        category: '學習',
+        target: '20 頁',
+        notes: '保持每日學習習慣',
+        createdAt: new Date().toISOString(),
+        history: {}
+      },
+      {
+        id: '3',
+        title: '核心運動或健走 30 分鐘',
+        category: '運動',
+        target: '30 分鐘',
+        notes: '維持規律運動與體力',
+        createdAt: new Date().toISOString(),
+        history: {}
+      }
+    ];
+
+    /* Helper: Get Today ISO Date String YYYY-MM-DD */
+    function getTodayKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    /* Initialize Application Data */
+    function initApp() {
+      // 1. Load Theme
+      const savedTheme = localStorage.getItem(STORAGE_THEME_KEY) || 'dark';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
+      // 2. Load Habits
+      const savedHabits = localStorage.getItem(STORAGE_HABITS_KEY);
+      if (savedHabits) {
+        try {
+          habits = JSON.parse(savedHabits);
+        } catch (e) {
+          habits = defaultHabits;
+        }
+      } else {
+        habits = defaultHabits;
+        saveHabitsToStorage();
+      }
+
+      // 3. Load Journal Entries
+      const savedJournals = localStorage.getItem(STORAGE_JOURNAL_KEY);
+      if (savedJournals) {
+        try {
+          journals = JSON.parse(savedJournals);
+        } catch(e) {
+          journals = {};
+        }
+      }
+
+      // 4. Update Date Display
+      updateDateHeader();
+
+      // 5. Render UI Components
+      renderHabits();
+      updateStatsAndProgress();
+      loadTodayJournalUI();
+      renderJournalHistory();
+
+      // PWA Install Prompt Listener
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const pwaBtn = document.getElementById('pwaInstallBtn');
+        if (pwaBtn) pwaBtn.classList.remove('hidden');
+      });
+    }
+
+    function saveHabitsToStorage() {
+      localStorage.setItem(STORAGE_HABITS_KEY, JSON.stringify(habits));
+    }
+
+    function saveJournalsToStorage() {
+      localStorage.setItem(STORAGE_JOURNAL_KEY, JSON.stringify(journals));
+    }
+
+    /* ==========================================================================
+       SOUND & HAPTIC FEEDBACK (Web Audio API & Web Vibrate)
+       ========================================================================== */
+    function playCheckSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      } catch(e){}
+
+      if (navigator.vibrate) {
+        navigator.vibrate([30, 20, 30]);
+      }
+    }
+
+    /* ==========================================================================
+       HABITS LIST & CHECK-IN LOGIC
+       ========================================================================== */
+    function toggleHabitCheck(habitId) {
+      const habit = habits.find(h => h.id === habitId);
+      if (!habit) return;
+
+      const today = getTodayKey();
+      const isChecked = habit.history && habit.history[today];
+
+      if (!habit.history) habit.history = {};
+
+      if (isChecked) {
+        delete habit.history[today];
+        showToast('已取消打卡');
+      } else {
+        habit.history[today] = true;
+        playCheckSound();
+        showToast(`👏 完成「${habit.title}」！`);
+      }
+
+      saveHabitsToStorage();
+      renderHabits();
+      updateStatsAndProgress();
+
+      // Check if all goals are completed today -> Trigger Confetti!
+      const totalToday = habits.length;
+      const completedToday = habits.filter(h => h.history && h.history[today]).length;
+      if (totalToday > 0 && completedToday === totalToday && !isChecked) {
+        triggerConfetti();
+      }
+    }
+
+    function calculateStreak(habit) {
+      if (!habit.history) return 0;
+      let streak = 0;
+      let checkDate = new Date();
+
+      while (true) {
+        const key = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+        if (habit.history[key]) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          // Check if today isn't checked yet, allow streak to include up to yesterday
+          const todayKey = getTodayKey();
+          if (key === todayKey) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            continue;
+          }
+          break;
+        }
+      }
+      return streak;
+    }
+
+    function renderHabits() {
+      const container = document.getElementById('habitList');
+      const emptyState = document.getElementById('emptyState');
+      const today = getTodayKey();
+
+      const filtered = habits.filter(h => {
+        if (activeCategory === 'all') return true;
+        return h.category === activeCategory;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      const categoryIcons = {
+        '健康': '🥗',
+        '學習': '📚',
+        '工作': '💼',
+        '運動': '🏃',
+        '心靈': '🧘'
+      };
+
+      container.innerHTML = filtered.map(h => {
+        const isDone = h.history && h.history[today];
+        const streak = calculateStreak(h);
+        const catEmoji = categoryIcons[h.category] || '🎯';
+
+        return `
+          <div class="clickable-card bg-white dark:bg-slate-900 rounded-2xl p-4 border ${isDone ? 'border-emerald-500/40 dark:border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/10' : 'border-gray-100 dark:border-slate-800'} shadow-sm flex items-center justify-between gap-3 transition-all">
+            <div class="flex items-center gap-3.5 flex-1 min-w-0">
+              <div class="w-11 h-11 rounded-2xl ${isDone ? 'bg-emerald-500 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300'} flex items-center justify-center text-xl shrink-0 transition-colors">
+                ${catEmoji}
+              </div>
+              <div class="truncate">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-sm text-gray-900 dark:text-white truncate ${isDone ? 'line-through text-gray-400 dark:text-slate-500' : ''}">${escapeHtml(h.title)}</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  <span class="bg-gray-100 dark:bg-slate-800 px-2 py-0.5 rounded-md font-medium text-[11px]">${h.category}</span>
+                  ${h.target ? `<span>• ${escapeHtml(h.target)}</span>` : ''}
+                  ${streak > 0 ? `<span class="text-amber-500 font-semibold flex items-center gap-0.5"><i class="ph-fill ph-fire text-xs"></i>${streak}天</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button onclick="toggleHabitCheck('${h.id}')" aria-label="打卡按鈕" class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDone ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-md shadow-emerald-500/20 scale-105' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200'}">
+                <i class="ph-bold ${isDone ? 'ph-check-fat text-xl' : 'ph-check text-xl'}"></i>
+              </button>
+              <button onclick="openEditHabitModal('${h.id}')" aria-label="編輯目標" class="w-8 h-8 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 flex items-center justify-center">
+                <i class="ph-bold ph-dots-three-vertical text-lg"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setCategoryFilter(category) {
+      activeCategory = category;
+      document.querySelectorAll('.cat-filter-btn').forEach(btn => {
+        if (btn.innerText.includes(category) || (category === 'all' && btn.innerText.includes('全部'))) {
+          btn.className = 'cat-filter-btn active bg-slate-800 text-white dark:bg-blue-600 dark:text-white px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all shadow-sm';
+        } else {
+          btn.className = 'cat-filter-btn bg-gray-200 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-3 py-1.5 rounded-full whitespace-nowrap font-medium transition-all';
+        }
+      });
+      renderHabits();
+    }
+
+    /* ==========================================================================
+       PROGRESS & STATS CALCULATIONS
+       ========================================================================== */
+    function updateStatsAndProgress() {
+      const today = getTodayKey();
+      const total = habits.length;
+      const completed = habits.filter(h => h.history && h.history[today]).length;
+
+      const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+      // Update Banner UI
+      document.getElementById('progressPercent').innerText = `${pct}%`;
+      document.getElementById('progressFraction').innerText = `(${completed}/${total} 已打卡)`;
+      document.getElementById('progressBarFill').style.width = `${pct}%`;
+
+      // Streak Calculation (Overall continuous days)
+      let maxHabitStreak = 0;
+      habits.forEach(h => {
+        const s = calculateStreak(h);
+        if (s > maxHabitStreak) maxHabitStreak = s;
+      });
+      document.getElementById('streakDays').innerText = `${maxHabitStreak} 天`;
+
+      // Motivation Text
+      const motivationEl = document.getElementById('motivationText');
+      if (pct === 100 && total > 0) {
+        motivationEl.innerHTML = `<i class="ph-bold ph-sparkle text-amber-300"></i><span>太棒了！今日所有目標皆已打卡達成 🎉</span>`;
+      } else if (pct >= 50) {
+        motivationEl.innerHTML = `<i class="ph-bold ph-sparkle text-amber-300"></i><span>進度已經過半，繼續保持這個衝勁！</span>`;
+      } else if (total > 0) {
+        motivationEl.innerHTML = `<i class="ph-bold ph-sparkle text-amber-300"></i><span>踏出第一步，今天也是充滿希望的一天！</span>`;
+      } else {
+        motivationEl.innerHTML = `<i class="ph-bold ph-sparkle text-amber-300"></i><span>新增目標以開始您的每日累積歷程。</span>`;
+      }
+
+      // Update Tab 3 Detailed Stats
+      let totalChecks = 0;
+      habits.forEach(h => {
+        if (h.history) {
+          totalChecks += Object.keys(h.history).length;
+        }
+      });
+      document.getElementById('statTotalChecks').innerText = totalChecks;
+      document.getElementById('statMaxStreak').innerText = `${maxHabitStreak} 天`;
+
+      // Category breakdown
+      const catCounts = {};
+      habits.forEach(h => {
+        catCounts[h.category] = (catCounts[h.category] || 0) + 1;
+      });
+
+      const catContainer = document.getElementById('categoryStatsContainer');
+      if (Object.keys(catCounts).length === 0) {
+        catContainer.innerHTML = '<p class="text-gray-400">尚未建立目標</p>';
+      } else {
+        catContainer.innerHTML = Object.entries(catCounts).map(([cat, count]) => {
+          const catPct = Math.round((count / total) * 100);
+          return `
+            <div>
+              <div class="flex justify-between mb-1">
+                <span class="font-medium text-gray-700 dark:text-slate-300">${cat}</span>
+                <span class="text-gray-500">${count} 個 (${catPct}%)</span>
+              </div>
+              <div class="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
+                <div class="bg-blue-500 h-2 rounded-full" style="width: ${catPct}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    /* ==========================================================================
+       MODAL & FORM HANDLING (ADD / EDIT)
+       ========================================================================== */
+    function openAddHabitModal() {
+      document.getElementById('editHabitId').value = '';
+      document.getElementById('modalTitle').innerHTML = `<i class="ph-bold ph-plus-circle text-blue-600"></i> 新增目標卡片`;
+      document.getElementById('habitForm').reset();
+
+      const modal = document.getElementById('habitModal');
+      const modalBox = document.getElementById('habitModalContainer');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modalBox.classList.remove('translate-y-full');
+      }, 10);
+    }
+
+    function openEditHabitModal(habitId) {
+      const habit = habits.find(h => h.id === habitId);
+      if (!habit) return;
+
+      document.getElementById('editHabitId').value = habit.id;
+      document.getElementById('modalTitle').innerHTML = `<i class="ph-bold ph-pencil-simple text-blue-600"></i> 編輯目標 / 刪除`;
+      document.getElementById('habitTitle').value = habit.title;
+      document.getElementById('habitCategory').value = habit.category;
+      document.getElementById('habitTarget').value = habit.target || '';
+      document.getElementById('habitNotes').value = habit.notes || '';
+
+      const modal = document.getElementById('habitModal');
+      const modalBox = document.getElementById('habitModalContainer');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modalBox.classList.remove('translate-y-full');
+      }, 10);
+    }
+
+    function closeHabitModal() {
+      const modal = document.getElementById('habitModal');
+      const modalBox = document.getElementById('habitModalContainer');
+      modalBox.classList.add('translate-y-full');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 250);
+    }
+
+    function handleSaveHabit(e) {
+      e.preventDefault();
+      const id = document.getElementById('editHabitId').value;
+      const title = document.getElementById('habitTitle').value.trim();
+      const category = document.getElementById('habitCategory').value;
+      const target = document.getElementById('habitTarget').value.trim();
+      const notes = document.getElementById('habitNotes').value.trim();
+
+      if (!title) return;
+
+      if (id) {
+        // Update existing
+        const habit = habits.find(h => h.id === id);
+        if (habit) {
+          habit.title = title;
+          habit.category = category;
+          habit.target = target;
+          habit.notes = notes;
+          showToast('目標修改成功');
+        }
+      } else {
+        // Create new
+        const newHabit = {
+          id: Date.now().toString(),
+          title,
+          category,
+          target,
+          notes,
+          createdAt: new Date().toISOString(),
+          history: {}
+        };
+        habits.unshift(newHabit);
+        showToast('新目標已新增');
+      }
+
+      saveHabitsToStorage();
+      renderHabits();
+      updateStatsAndProgress();
+      closeHabitModal();
+    }
+
+    /* ==========================================================================
+       DAILY REFLECTION JOURNAL LOGIC
+       ========================================================================== */
+    function selectMood(mood) {
+      selectedMood = mood;
+      document.querySelectorAll('.mood-btn').forEach(btn => {
+        if (btn.innerText.includes(mood)) {
+          btn.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-slate-800');
+        } else {
+          btn.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-slate-800');
+        }
+      });
+    }
+
+    function loadTodayJournalUI() {
+      const today = getTodayKey();
+      document.getElementById('journalDateLabel').innerText = today;
+      const entry = journals[today];
+      if (entry) {
+        document.getElementById('journalText').value = entry.text || '';
+        selectMood(entry.mood || '😄');
+      } else {
+        document.getElementById('journalText').value = '';
+        selectMood('😄');
+      }
+    }
+
+    function saveTodayJournal() {
+      const today = getTodayKey();
+      const text = document.getElementById('journalText').value.trim();
+
+      journals[today] = {
+        date: today,
+        mood: selectedMood,
+        text: text,
+        updatedAt: new Date().toISOString()
+      };
+
+      saveJournalsToStorage();
+      renderJournalHistory();
+      showToast('今日反思已儲存');
+    }
+
+    function renderJournalHistory() {
+      const container = document.getElementById('journalHistoryList');
+      const sortedKeys = Object.keys(journals).sort().reverse();
+
+      if (sortedKeys.length === 0) {
+        container.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">尚無反思日誌紀錄</p>';
+        return;
+      }
+
+      container.innerHTML = sortedKeys.map(key => {
+        const item = journals[key];
+        return `
+          <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-gray-100 dark:border-slate-800 text-xs space-y-1">
+            <div class="flex justify-between items-center font-semibold text-gray-700 dark:text-slate-300">
+              <span class="flex items-center gap-1">${item.mood} ${item.date}</span>
+            </div>
+            <p class="text-gray-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">${escapeHtml(item.text || '無內文內容')}</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* ==========================================================================
+       TAB NAVIGATION & UTILS
+       ========================================================================== */
+    function switchTab(tabName) {
+      const habitsView = document.getElementById('habitsView');
+      const journalView = document.getElementById('journalView');
+      const statsView = document.getElementById('statsView');
+
+      const habitsBtn = document.getElementById('tabHabitsBtn');
+      const journalBtn = document.getElementById('tabJournalBtn');
+      const statsBtn = document.getElementById('tabStatsBtn');
+
+      // Hide all
+      habitsView.classList.add('hidden');
+      journalView.classList.add('hidden');
+      statsView.classList.add('hidden');
+
+      // Reset Styles
+      [habitsBtn, journalBtn, statsBtn].forEach(btn => {
+        btn.className = "flex-1 py-2 rounded-lg text-center text-gray-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all flex items-center justify-center gap-1.5";
+      });
+
+      const activeClass = "flex-1 py-2 rounded-lg text-center font-bold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm transition-all flex items-center justify-center gap-1.5";
+
+      if (tabName === 'habits') {
+        habitsView.classList.remove('hidden');
+        habitsBtn.className = activeClass;
+      } else if (tabName === 'journal') {
+        journalView.classList.remove('hidden');
+        journalBtn.className = activeClass;
+      } else if (tabName === 'stats') {
+        statsView.classList.remove('hidden');
+        statsBtn.className = activeClass;
+      }
+    }
+
+    function updateDateHeader() {
+      const now = new Date();
+      const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+      document.getElementById('currentDateText').innerText = now.toLocaleDateString('zh-TW', options);
+    }
+
+    /* Toast Helper */
+    let toastTimeout = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const msgEl = document.getElementById('toastMsg');
+      msgEl.innerText = msg;
+
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2000);
+    }
+
+    /* Confetti Burst */
+    function triggerConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+    }
+
+    /* HTML Escape Utility */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, function(m) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[m];
+      });
+    }
+
+    /* Theme Toggle */
+    document.getElementById('themeToggleBtn').addEventListener('click', () => {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem(STORAGE_THEME_KEY, isDark ? 'dark' : 'light');
+    });
+
+    /* PWA Install Action */
+    document.getElementById('pwaInstallBtn').addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        showToast('成功安裝目標手帳 Pro！');
+      }
+      deferredPrompt = null;
+      document.getElementById('pwaInstallBtn').classList.add('hidden');
+    });
+
+    /* Initialize App on Load */
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
